@@ -7,10 +7,11 @@ def download_nasa_data():
     print("Querying NASA Exoplanet Archive API...")
     
     # Astronomical Data Query Language (ADQL) query
-    # Pulling: name, star name, method, year, radius (Earths), mass (Earths), orbit (days), star temp (K), distance (parsecs)
+    # Pulling: name, star name, method, year, radius (Earths), mass (Earths), orbit (days), star temp (K), distance (parsecs), star age (Gyr)
     query = """
     select pl_name, hostname, discoverymethod, disc_year, 
-           pl_rade, pl_masse, pl_orbper, st_teff, sy_dist 
+           pl_rade, pl_masse, pl_orbper, st_teff, sy_dist, st_age,
+           pl_orbsmax, st_rad
     from pscomppars
     """
     
