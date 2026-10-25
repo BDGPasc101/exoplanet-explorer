@@ -11,7 +11,7 @@ def download_nasa_data():
     query = """
     select pl_name, hostname, discoverymethod, disc_year, 
            pl_rade, pl_masse, pl_orbper, st_teff, sy_dist, st_age,
-           pl_orbsmax, st_rad
+           pl_orbsmax, st_rad, st_met
     from pscomppars
     """
     

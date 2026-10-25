@@ -103,111 +103,136 @@ col1, col2 = st.columns(2)
 col1.metric(label="Total Confirmed Planets", value=f"{len(df):,}")
 col2.metric(label="Planets Matching Criteria", value=f"{len(filtered_df):,}")
 
-# --- 3D VISUALIZATION & DETAILS PANEL ---
-st.subheader("3D Exoplanet Distribution")
+# --- MAIN DASHBOARD TABS ---
+tab_3d, tab_seti = st.tabs(["?? 3D Universe", "?? SETI & Metallicity Analytics"])
 
-if not filtered_df.empty:
-    # Split the screen layout (Plot takes 75% width, Details take 25%)
-    col_plot, col_details = st.columns([3, 1])
+with tab_3d:
+    st.subheader("3D Exoplanet Distribution")
     
-    with col_plot:
-        fig = px.scatter_3d(
-            filtered_df, 
-            x='pl_orbper', 
-            y='pl_masse', 
-            z='pl_rade',
+    if not filtered_df.empty:
+        # Split the screen layout (Plot takes 75% width, Details take 25%)
+        col_plot, col_details = st.columns([3, 1])
+        
+        with col_plot:
+            fig = px.scatter_3d(
+                filtered_df, 
+                x='pl_orbper', 
+                y='pl_masse', 
+                z='pl_rade',
+                color='st_teff',
+                color_continuous_scale='plasma',
+                hover_name='pl_name',
+                hover_data={
+                    'discoverymethod': True, 
+                    'sy_dist': True, 
+                    'Star Class': True,     
+                    'st_teff': False
+                },
+                labels={
+                    'pl_orbper': 'Orbital Period (Days)',
+                    'pl_masse': 'Mass (Earths)',
+                    'pl_rade': 'Radius (Earths)',
+                    'sy_dist': 'Distance (Parsecs)'
+                }
+            )
+            
+            fig.update_layout(scene=dict(
+                xaxis_type="log", 
+                yaxis_type="log"
+            ), margin=dict(l=0, r=0, b=0, t=0), height=600)
+            
+            st.plotly_chart(fig, use_container_width=True, key="planet_plot_main")
+            
+        with col_details:
+            st.subheader("Planet Profile")
+            
+            available_planets = filtered_df['pl_name'].tolist()
+            
+            selected_planet_name = st.selectbox(
+                "?? Search or select a planet:", 
+                options=available_planets,
+                index=0 if available_planets else None
+            )
+            
+            if selected_planet_name:
+                planet = filtered_df[filtered_df['pl_name'] == selected_planet_name].iloc[0]
+                
+                st.markdown(f"### {planet['pl_name']}")
+                st.markdown(f"**?? Mass:** {planet['pl_masse']} Earths")
+                st.markdown(f"**?? Radius:** {planet['pl_rade']} Earths")
+                st.markdown(f"**?? Orbit:** {planet['pl_orbper']} Days")
+                st.markdown(f"**?? Distance:** {planet['sy_dist']} Parsecs")
+                
+                esi_score = float(planet['ESI'])
+                st.markdown("---")
+                st.markdown(f"**?? Earth Similarity (ESI):** `{esi_score:.2f} / 1.00`")
+                if esi_score > 0.8:
+                    st.info("High probability of Earth-like physical characteristics.")
+                
+                st.divider()
+                hz_status = "? Yes" if planet['is_habitable_zone'] else "? No"
+                st.markdown(f"**?? Habitable Zone:** {hz_status}")
+                
+                if pd.notna(planet['hz_inner']) and pd.notna(planet['hz_outer']) and pd.notna(planet['pl_orbsmax']):
+                    st.caption(f"Orbit: {planet['pl_orbsmax']:.3f} AU | Zone: {planet['hz_inner']:.3f} - {planet['hz_outer']:.3f} AU")
+                
+                st.progress(esi_score)
+                st.divider()
+                st.markdown(f"**?? Discovery:** {planet['discoverymethod']} ({planet['disc_year']})")
+                st.markdown(f"**?? Star:** {planet['Star Class']}")
+                
+                age_display = f"{planet['st_age']} Billion Years" if pd.notna(planet['st_age']) else "Unknown"
+                st.markdown(f"**? Star Age:** {age_display}")
+                
+                st.divider()
+                safe_planet_name = urllib.parse.quote(planet['pl_name'])
+                nasa_url = f"https://exoplanetarchive.ipac.caltech.edu/overview/{safe_planet_name}"
+                
+                st.link_button("?? View on NASA Exoplanet Archive", nasa_url, use_container_width=True)
+            else:
+                st.info("?? Select a planet to view its profile here.")
+                
+    else:
+        st.warning("No planets match your current filter criteria.")
+
+with tab_seti:
+    st.subheader("Stellar Metallicity vs. Planetary Mass")
+    st.markdown("""
+    **Guided by the Galactic Habitable Zone (GHZ):**
+    In the search for extraterrestrial life, prioritizing regions to listen for radio signals (SETI) relies heavily on stellar metallicity ([Fe/H]). 
+    *   **Low Metallicity (Left):** Stars lack the heavy elements required to form rocky, Earth-like planets.
+    *   **High Metallicity (Right):** Correlates strongly with the formation of massive Gas Giants, which often migrate inward and destabilize terrestrial orbits.
+    *   **The Target Zone:** SETI targets are often prioritized around solar metallicity (~0.0), where stable terrestrial worlds are most likely to form.
+    """)
+    
+    met_df = filtered_df.dropna(subset=['st_met', 'pl_masse'])
+    
+    if not met_df.empty:
+        fig_met = px.scatter(
+            met_df,
+            x='st_met',
+            y='pl_masse',
             color='st_teff',
             color_continuous_scale='plasma',
             hover_name='pl_name',
-            hover_data={
-                'discoverymethod': True, 
-                'sy_dist': True, 
-                'Star Class': True,     
-                'st_teff': False
-            },
+            log_y=True,
             labels={
-                'pl_orbper': 'Orbital Period (Days)',
-                'pl_masse': 'Mass (Earths)',
-                'pl_rade': 'Radius (Earths)',
-                'sy_dist': 'Distance (Parsecs)'
+                'st_met': 'Stellar Metallicity [Fe/H]',
+                'pl_masse': 'Planet Mass (Earth Masses, Log Scale)',
+                'st_teff': 'Star Temp (K)'
             }
         )
         
-        fig.update_layout(scene=dict(
-            xaxis_type="log", 
-            yaxis_type="log"
-        ), margin=dict(l=0, r=0, b=0, t=0), height=600)
-        
-        # Capture the click event using on_select="rerun"
-        event = st.plotly_chart(
-            fig, 
-            on_select="rerun", 
-            selection_mode="points", 
-            use_container_width=True,
-            key="planet_plot" 
+        fig_met.add_vline(
+            x=0.0, 
+            line_dash="dash", 
+            line_color="white", 
+            annotation_text="Solar Metallicity (Earth-like target)"
         )
         
-    with col_details:
-        st.subheader("Planet Profile")
-        
-        # 1. Create a list of the currently filtered planet names
-        available_planets = filtered_df['pl_name'].tolist()
-        
-        # 2. Build a searchable dropdown menu
-        selected_planet_name = st.selectbox(
-            "?? Search or select a planet:", 
-            options=available_planets,
-            index=0 if available_planets else None
-        )
-        
-        # 3. Display the profile for the selected planet
-        if selected_planet_name:
-            # Extract that exact row from the dataframe
-            planet = filtered_df[filtered_df['pl_name'] == selected_planet_name].iloc[0]
-            
-            st.markdown(f"### {planet['pl_name']}")
-            st.markdown(f"**?? Mass:** {planet['pl_masse']} Earths")
-            st.markdown(f"**?? Radius:** {planet['pl_rade']} Earths")
-            st.markdown(f"**?? Orbit:** {planet['pl_orbper']} Days")
-            st.markdown(f"**?? Distance:** {planet['sy_dist']} Parsecs")
-            # --- NEW: Display the ESI ---
-            esi_score = float(planet['ESI'])
-            st.markdown("---")
-            st.markdown(f"**?? Earth Similarity (ESI):** `{esi_score:.2f} / 1.00`")
-            
-            # Change color based on how high the score is
-            if esi_score > 0.8:
-                st.info("High probability of Earth-like physical characteristics.")
-
-            st.divider()
-            # HZ Display
-            hz_status = "? Yes" if planet['is_habitable_zone'] else "? No"
-            st.markdown(f"**?? Habitable Zone:** {hz_status}")
-            
-            if pd.notna(planet['hz_inner']) and pd.notna(planet['hz_outer']) and pd.notna(planet['pl_orbsmax']):
-                st.caption(f"Orbit: {planet['pl_orbsmax']:.3f} AU | Zone: {planet['hz_inner']:.3f} - {planet['hz_outer']:.3f} AU")
-            
-            # Render the progress bar
-            st.progress(esi_score)
-            st.divider()
-            st.markdown(f"**?? Discovery:** {planet['discoverymethod']} ({planet['disc_year']})")
-            st.markdown(f"**?? Star:** {planet['Star Class']}")
-            # Format the age, handling NaN values cleanly
-            age_display = f"{planet['st_age']} Billion Years" if pd.notna(planet['st_age']) else "Unknown"
-            st.markdown(f"**? Star Age:** {age_display}")
-            
-            st.divider()
-            # Generate the URL-safe name and create a button
-            safe_planet_name = urllib.parse.quote(planet['pl_name'])
-            nasa_url = f"https://exoplanetarchive.ipac.caltech.edu/overview/{safe_planet_name}"
-            
-            st.link_button("?? View on NASA Exoplanet Archive", nasa_url, use_container_width=True)
-        else:
-            # The default message before the user clicks anything
-            st.info("?? Click on any planet in the 3D plot to lock its profile here.")
-            
-else:
-    st.warning("No planets match your current filter criteria.")
+        st.plotly_chart(fig_met, use_container_width=True, key="planet_plot_seti")
+    else:
+        st.warning("No metallicity data available for the currently filtered planets.")
 
 # --- DATA TABLE ---
 st.subheader("Filtered Dataset")
